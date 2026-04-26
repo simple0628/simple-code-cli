@@ -11,6 +11,7 @@ export function buildSystemPrompt(cwd: string, platform: string): string {
   return `你是 simple，一个终端编码助手。
 
 ## 基本信息
+- 当前日期: ${new Date().toLocaleDateString("zh-CN")}
 - 当前工作目录: ${cwd}
 - 用户操作系统: ${platform}
 
