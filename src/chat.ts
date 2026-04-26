@@ -132,7 +132,13 @@ export async function chatRound(
         const tool = toolMap.get(tc.name);
         if (!tool) continue;
 
-        const args = JSON.parse(tc.arguments) as Record<string, unknown>;
+        let args: Record<string, unknown>;
+        try {
+          args = JSON.parse(tc.arguments) as Record<string, unknown>;
+        } catch {
+          messages.push({ role: "tool", tool_call_id: tc.id, content: "参数解析失败" });
+          continue;
+        }
         const tip = tool.label(args);
         callbacks.onToolStart(tip);
 

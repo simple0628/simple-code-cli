@@ -51,13 +51,47 @@ ${chalk.yellow("6. 用户责任")}
 
 ${chalk.dim("按回车键表示你已阅读、理解并同意以上全部内容...")}`;
 
-function ask(question: string): Promise<string> {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer.trim());
+function ask(question: string, mask = false): Promise<string> {
+  if (!mask) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    return new Promise((resolve) => {
+      rl.question(question, (answer) => {
+        rl.close();
+        resolve(answer.trim());
+      });
     });
+  }
+  return new Promise((resolve) => {
+    process.stdout.write(question);
+    let buf = "";
+    const stdin = process.stdin;
+    const wasRaw = stdin.isRaw;
+    stdin.setRawMode(true);
+    stdin.resume();
+    const onData = (data: Buffer) => {
+      const chunk = data.toString("utf8");
+      for (const ch of chunk) {
+        if (ch === "\r" || ch === "\n") {
+          stdin.removeListener("data", onData);
+          stdin.setRawMode(wasRaw ?? false);
+          stdin.pause();
+          process.stdout.write("\n");
+          resolve(buf.trim());
+          return;
+        } else if (ch === "\u007f" || ch === "\b") {
+          if (buf.length > 0) {
+            buf = buf.slice(0, -1);
+            process.stdout.write("\b \b");
+          }
+        } else if (ch === "\u0003") {
+          process.exit(0);
+        } else {
+          buf += ch;
+          process.stdout.write("*");
+        }
+      }
+    };
+    stdin.on("data", onData);
   });
 }
 
@@ -99,7 +133,7 @@ async function testApiKey(apiKey: string): Promise<boolean> {
 
 async function inputAndVerifyKey(prompt = "  请输入你的 API Key: "): Promise<string> {
   while (true) {
-    const apiKey = await ask(prompt);
+    const apiKey = await ask(prompt, true);
     if (!apiKey) {
       console.log(chalk.red("  API Key 不能为空，请重新输入"));
       continue;
