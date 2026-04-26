@@ -1,0 +1,40 @@
+{
+  "name": "simple-code-cli",
+  "version": "0.1.2",
+  "description": "一款简单的终端 AI 编码助手",
+  "type": "module",
+  "main": "dist/main.js",
+  "bin": {
+    "simple": "dist/main.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc && node dist/main.js",
+    "prepublishOnly": "tsc"
+  },
+  "keywords": ["ai", "cli", "coding", "assistant", "deepseek", "terminal"],
+  "author": "shenmo",
+  "license": "GPL-3.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shenmo/simple-code"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "cheerio": "^1.2.0",
+    "glob": "^13.0.6",
+    "marked": "^15.0.12",
+    "marked-terminal": "^7.3.0",
+    "openai": "^6.34.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}
