@@ -1,6 +1,6 @@
 {
   "name": "simple-code-cli",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "一款简单的终端 AI 编码助手",
   "type": "module",
   "main": "dist/main.js",

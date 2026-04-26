@@ -16,7 +16,7 @@ import { getApiKey, resetConfig, loadSkills, SKILLS_DIR } from "./config.js";
 import { buildSystemPrompt, chatRound, saveMemory } from "./chat.js";
 import { resetInterrupt, triggerInterrupt, getSignal } from "./state.js";
 
-const VERSION = "0.1.2";
+const VERSION = "0.1.4";
 
 // Markdown 终端渲染
 marked.use(markedTerminal() as Parameters<typeof marked.use>[0]);
@@ -152,36 +152,43 @@ function addToolLine(text: string): void {
 let toolLogs: string[] = [];
 let logExpanded = false;
 let memorySavedFlag = false;
-let logActualRows = 0;
 let statsText = ""; // 保存统计行文本，用于重绘
+let logRowCount = 0;
 
-function calcTermRows(text: string): number {
-  // 计算一行文本在终端里实际占几行（考虑折行）
-  const termWidth = process.stdout.columns || 80;
-  const stripped = text.replace(/\x1b\[[0-9;]*m/g, "");
-  let w = 0;
-  for (const ch of stripped) {
-    const code = ch.codePointAt(0)!;
-    if ((code >= 0x4e00 && code <= 0x9fff) ||
-        (code >= 0x3000 && code <= 0x303f) ||
-        (code >= 0xff00 && code <= 0xffef) ||
-        (code >= 0x3400 && code <= 0x4dbf) ||
-        (code >= 0x20000 && code <= 0x2a6df)) {
-      w += 2;
-    } else {
-      w += 1;
-    }
+function charWidth(code: number): number {
+  if ((code >= 0x4e00 && code <= 0x9fff) ||
+      (code >= 0x3000 && code <= 0x303f) ||
+      (code >= 0xff00 && code <= 0xffef) ||
+      (code >= 0x3400 && code <= 0x4dbf) ||
+      (code >= 0x20000 && code <= 0x2a6df)) {
+    return 2;
   }
-  return Math.max(1, Math.ceil(w / termWidth));
+  return 1;
 }
 
 function logPrint(text: string): void {
   console.log(text);
-  logActualRows += calcTermRows(text);
+  logRowCount++;
+  // 计算文本显示宽度，超过终端宽度的部分算额外行
+  const stripped = text.replace(/\x1b\[[0-9;]*m/g, "");
+  const termWidth = process.stdout.columns || 80;
+  let w = 0;
+  for (const ch of stripped) {
+    w += charWidth(ch.codePointAt(0)!);
+  }
+  logRowCount += Math.floor(w / termWidth);
+}
+
+function eraseLog(): void {
+  for (let i = 0; i < logRowCount; i++) {
+    process.stdout.write("\x1b[A\x1b[2K\r");
+  }
+  process.stdout.write("\x1b[J");
+  logRowCount = 0;
 }
 
 function printLogFolded(): void {
-  logActualRows = 0;
+  logRowCount = 0;
   logPrint(statsText);
   const prefix = memorySavedFlag ? "记忆已保存，" : "";
   logPrint(chalk.dim(`  ${prefix}${toolLogs.length}个工具操作 — Ctrl+O 展开`));
@@ -189,33 +196,38 @@ function printLogFolded(): void {
 }
 
 function printLogExpanded(): void {
-  logActualRows = 0;
+  logRowCount = 0;
   logPrint(statsText);
   logPrint(chalk.dim("─── 操作详情 ───"));
-  toolLogs.forEach((log, i) => {
-    const parts = log.split("\n");
+  let lineCount = 2;
+  const maxLines = 20;
+  let truncated = false;
+  for (let i = 0; i < toolLogs.length; i++) {
+    if (lineCount >= maxLines) { truncated = true; break; }
+    const parts = toolLogs[i]!.split("\n");
     const header = parts[0]!;
     const body = parts.slice(1).join("\n").trim();
     logPrint(chalk.dim(`${i + 1}. ${header}`));
+    lineCount++;
     if (body) {
       const bodyLines = body.split("\n").slice(0, 10);
-      bodyLines.forEach((bl) => {
+      for (const bl of bodyLines) {
+        if (lineCount >= maxLines) { truncated = true; break; }
         logPrint(chalk.dim(`   ${bl}`));
-      });
-      if (body.split("\n").length > 10) {
+        lineCount++;
+      }
+      if (!truncated && body.split("\n").length > 10) {
         logPrint(chalk.dim(`   ... 共 ${body.split("\n").length} 行`));
+        lineCount++;
       }
     }
-  });
+    if (truncated) break;
+  }
+  if (truncated) {
+    logPrint(chalk.dim("   ... 更多内容省略"));
+  }
   logPrint(chalk.dim("────────────────── Ctrl+O 折叠"));
   logExpanded = true;
-}
-
-function eraseLog(): void {
-  for (let i = 0; i < logActualRows; i++) {
-    process.stdout.write("\x1b[A\x1b[2K\r");
-  }
-  logActualRows = 0;
 }
 
 // ==================== 输入处理 ====================
@@ -358,7 +370,7 @@ async function main(): Promise<void> {
       if (toolLogs.length) {
         // 清除 "> " 提示行
         process.stdout.write("\x1b[2K\r");
-        // 擦除统计行 + log 内容（统一管理）
+        // 擦除 log 区域
         eraseLog();
         // 重绘
         if (logExpanded) {
@@ -366,8 +378,6 @@ async function main(): Promise<void> {
         } else {
           printLogExpanded();
         }
-        // 清除下方残留
-        process.stdout.write("\x1b[J");
       } else {
         console.log(chalk.dim("  暂无操作记录"));
       }
