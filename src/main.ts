@@ -16,7 +16,7 @@ import { getApiKey, resetConfig, loadSkills, SKILLS_DIR } from "./config.js";
 import { buildSystemPrompt, chatRound, saveMemory } from "./chat.js";
 import { resetInterrupt, triggerInterrupt, getSignal } from "./state.js";
 
-const VERSION = "0.1.5";
+const VERSION = "0.1.6";
 
 // Markdown 终端渲染
 marked.use(markedTerminal() as Parameters<typeof marked.use>[0]);
